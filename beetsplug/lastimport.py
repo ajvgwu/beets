@@ -36,6 +36,7 @@ class LastImportPlugin(plugins.BeetsPlugin):
             {
                 "per_page": 500,
                 "retry_limit": 3,
+                "increase_only": False,
             }
         )
         self.item_types = {
@@ -45,7 +46,13 @@ class LastImportPlugin(plugins.BeetsPlugin):
     def commands(self):
         cmd = ui.Subcommand("lastimport", help="import last.fm play-count")
 
+        cmd.parser.add_option(
+            '-i', '--increase-only', action='store_true', dest='increase_only',
+            help='compare new count to old count and only update library if new count is greater')
+
         def func(lib, opts, args):
+            if opts.increase_only is not None:
+                self.config['increase_only'] = opts.increase_only
             import_lastfm(lib, self._log)
 
         cmd.func = func
@@ -197,8 +204,10 @@ def fetch_tracks(user, page, limit):
 
 
 def process_tracks(lib, tracks, log):
+    increase_only = config['lastimport']['increase_only'].get(bool)
     total = len(tracks)
     total_found = 0
+    total_skips = 0
     total_fails = 0
     log.info("Received {0} tracks in this page, processing...", total)
 
@@ -251,6 +260,12 @@ def process_tracks(lib, tracks, log):
             )
             song = lib.items(query).get()
 
+        # TODO: try to remove trailing ' (...)' from title ???
+        # e.g., 'This is a title (with something else)' --> 'This is a title'
+
+        # TODO: try by dropping all non-alphanumeric chars from title ???
+        # e.g., 'How/about/this?' --> 'how about this'
+
         # Last resort, try just replacing to utf-8 quote
         if song is None:
             title = title.replace("'", "\u2019")
@@ -266,16 +281,22 @@ def process_tracks(lib, tracks, log):
         if song is not None:
             count = int(song.get("play_count", 0))
             new_count = int(tracks[num].get("playcount", 1))
-            log.debug(
-                "match: {0} - {1} ({2}) " "updating: play_count {3} => {4}",
-                song.artist,
-                song.title,
-                song.album,
-                count,
-                new_count,
-            )
-            song["play_count"] = new_count
-            song.store()
+            if increase_only and new_count <= count:
+                log.debug('match: {0} - {1} ({2}) '
+                          'skipping: play_count {3} <= {4}',
+                          song.artist, song.title, song.album, count, new_count)
+                total_skips += 1
+            else:
+                log.debug(
+                    "match: {0} - {1} ({2}) " "updating: play_count {3} => {4}",
+                    song.artist,
+                    song.title,
+                    song.album,
+                    count,
+                    new_count,
+                )
+                song["play_count"] = new_count
+                song.store()
             total_found += 1
         else:
             total_fails += 1
@@ -283,9 +304,11 @@ def process_tracks(lib, tracks, log):
 
     if total_fails > 0:
         log.info(
-            "Acquired {0}/{1} play-counts ({2} unknown)",
+            "Acquired {0}/{1} play-counts, skipped {2} and updated {3} ({4} unknown)",
             total_found,
             total,
+            total_skips,
+            (total_found - total_skips),
             total_fails,
         )
 
