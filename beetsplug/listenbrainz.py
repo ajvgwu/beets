@@ -6,6 +6,7 @@ import musicbrainzngs
 import requests
 
 from beets import config, ui, dbcore
+from beets.dbcore import types
 from beets.plugins import BeetsPlugin
 from beetsplug.lastimport import process_tracks
 
@@ -23,6 +24,10 @@ class ListenBrainzPlugin(BeetsPlugin):
         self.username = self.config["username"].get()
         self.AUTH_HEADER = {"Authorization": f"Token {self.token}"}
         config["listenbrainz"]["token"].redact = True
+
+        self.item_types = {
+            'listen_count': types.INTEGER,
+        }
 
     def commands(self):
         """Add beet UI commands to interact with ListenBrainz."""
