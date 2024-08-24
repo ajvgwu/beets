@@ -260,90 +260,6 @@ def process_tracks(lib, tracks, log):
             )
             song = lib.items(query).get()
 
-        # TODO: try to remove trailing ' (...)' from title ???
-        # e.g., 'This is a title (with something else)' --> 'This is a title'
-
-        # TODO: try by dropping all non-alphanumeric chars from title ???
-        # e.g., 'How/about/this?' --> 'how about this'
-
-        # Try some other non-standard replacements
-        # TODO: generalize these replacements, and/or have the user put them in an external file
-        if song is None:
-            # log.debug("no title match yet, trying a query for a custom match")
-            # query = dbcore.AndQuery(
-            #     [
-            #         dbcore.query.SubstringQuery("artist", artist),
-            #         dbcore.query.SubstringQuery("title_lastimport", title),
-            #     ]
-            # )
-            # song = lib.items(query).get()
-            # TODO: do this in a different way, because "title_lastimport" is a flexible attribute and cannot be queried as a SQLite DB Column !!!
-            # NOTE: here is a way to find all items in the library with the "title_lastimport" flexible attr set: beet list 'title_lastimport::^.+$'
-            pass
-        if song is None:
-            log.debug("no title match yet, trying some different abbreviation styles")
-            title = title.replace(' Part 1', ', Pt. One')
-            title = title.replace(' Part 2', ', Pt. Two')
-            title = title.replace(' Part 2 & 3', ', Pts. Two & Three')
-            title = title.replace(', Pt. Two & 3', ', Pts. Two & Three')
-            query = dbcore.AndQuery(
-                [
-                    dbcore.query.SubstringQuery("artist", artist),
-                    dbcore.query.SubstringQuery("title", title),
-                ]
-            )
-            song = lib.items(query).get()
-        if song is None:
-            log.debug("no title match yet, replacing with alternate dash character")
-            title = title.replace('-', '‐')
-            query = dbcore.AndQuery(
-                [
-                    dbcore.query.SubstringQuery("artist", artist),
-                    dbcore.query.SubstringQuery("title", title),
-                ]
-            )
-            song = lib.items(query).get()
-        if song is None:
-            log.debug("no title match yet, replacing dash character but the other way around")
-            title = title.replace('‐', '-')
-            query = dbcore.AndQuery(
-                [
-                    dbcore.query.SubstringQuery("artist", artist),
-                    dbcore.query.SubstringQuery("title", title),
-                ]
-            )
-            song = lib.items(query).get()
-        if song is None:
-            log.debug("no title match yet, remove spaces surrounding forward slashes")
-            title = title.replace(' / ', '/')
-            query = dbcore.AndQuery(
-                [
-                    dbcore.query.SubstringQuery("artist", artist),
-                    dbcore.query.SubstringQuery("title", title),
-                ]
-            )
-            song = lib.items(query).get()
-        if song is None:
-            log.debug("no title match yet, add spaces around forward slashes")
-            title = title.replace('/', ' / ')
-            query = dbcore.AndQuery(
-                [
-                    dbcore.query.SubstringQuery("artist", artist),
-                    dbcore.query.SubstringQuery("title", title),
-                ]
-            )
-            song = lib.items(query).get()
-        if song is None:
-            log.debug("no title match yet, remove commas")
-            title = title.replace(',', '')
-            query = dbcore.AndQuery(
-                [
-                    dbcore.query.SubstringQuery("artist", artist),
-                    dbcore.query.SubstringQuery("title", title),
-                ]
-            )
-            song = lib.items(query).get()
-
         # Last resort, try just replacing to utf-8 quote
         if song is None:
             title = title.replace("'", "\u2019")
@@ -354,6 +270,14 @@ def process_tracks(lib, tracks, log):
                     dbcore.query.SubstringQuery("title", title),
                 ]
             )
+            song = lib.items(query).get()
+
+        # If nothing else worked, try querying for a flex attr called 'title_lastimport'
+        if song is None:
+            log.debug("no title match yet, trying query for flex attr 'title_lastimport'")
+            query = f'artist:"{artist.replace('"', '\\"')}"'
+            query += ' '
+            query += f'title_lastimport:"{title.replace('"', '\\"')}"'
             song = lib.items(query).get()
 
         if song is not None:
