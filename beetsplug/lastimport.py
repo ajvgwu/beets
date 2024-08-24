@@ -269,6 +269,15 @@ def process_tracks(lib, tracks, log):
         # Try some other non-standard replacements
         # TODO: generalize these replacements, and/or have the user put them in an external file
         if song is None:
+            log.debug("no title match yet, trying a query for a custom match")
+            query = dbcore.AndQuery(
+                [
+                    dbcore.query.SubstringQuery("artist", artist),
+                    dbcore.query.SubstringQuery("title_lastimport", title),
+                ]
+            )
+            song = lib.items(query).get()
+        if song is None:
             log.debug("no title match yet, trying some different abbreviation styles")
             title = title.replace(' Part 1', ', Pt. One')
             title = title.replace(' Part 2', ', Pt. Two')
