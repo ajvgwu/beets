@@ -36,19 +36,17 @@ class ListenBrainzPlugin(BeetsPlugin):
         lbupdate_cmd.func = func
 
         updatelistens_cmd = ui.Subcommand(
-            'lbupdatelistens', help=f'Fetch top tracks from {self.data_source} and update listen_count')
+            'lbupdatelistens', help=f'Fetch top track entries from {self.data_source} and update listen_count')
         updatelistens_cmd.parser.add_option(
-            '-c', '--count', type='int', dest='opt_count',
-            help='number of top tracks to fetch')
+            '-c', '--count', type='int', dest='count',
+            help='number of entries to fetch')
         updatelistens_cmd.parser.add_option(
-            '-o', '--offset', type='int', dest='opt_offset',
+            '-o', '--offset', type='int', dest='offset',
             help='number of entries to skip from the beginning')
         def updatelistens_func(lib, opts, args):
-            if opts.opt_count is not None:
-                self.config['opt_count'] = opts.opt_count
-            if opts.opt_offset is not None:
-                self.config['opt_offset'] = opts.opt_offset
-            self._lb_update_listens(lib, self._log)
+            opt_count = opts.count if opts.count is not None else None
+            opt_offset = opts.offset if opts.offset is not None else None
+            self._lb_update_listens(lib, self._log, count=opt_count, offset=opt_offset)
         updatelistens_cmd.func = updatelistens_func
 
         return [lbupdate_cmd, updatelistens_cmd]
@@ -68,9 +66,9 @@ class ListenBrainzPlugin(BeetsPlugin):
         log.info("{0} unknown play-counts", unknown_total)
         log.info("{0} play-counts imported", found_total)
 
-    def _lb_update_listens(self, lib, log):
-        param_count = self.config['opt_count']
-        param_offset = self.config['opt_offset']
+    def _lb_update_listens(self, lib, log, count=None, offset=None):
+        param_count = count
+        param_offset = offset
         param_range = 'all_time'
 
         request_url = f'{self.ROOT}/stats/user/{self.username}/recordings'
