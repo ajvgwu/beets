@@ -275,9 +275,9 @@ def process_tracks(lib, tracks, log):
         # If nothing else worked, try querying for a flex attr called 'title_lastimport'
         if song is None:
             log.debug("no title match yet, trying query for flex attr 'title_lastimport'")
-            query = f'artist:"{artist.replace('"', '\\"')}"'
+            query = f'artist:"{artist.replace("\"", "\\\"")}"'
             query += ' '
-            query += f'title_lastimport:"{title.replace('"', '\\"')}"'
+            query += f'title_lastimport:"{title.replace("\"", "\\\"")}"'
             song = lib.items(query).get()
 
         if song is not None:
