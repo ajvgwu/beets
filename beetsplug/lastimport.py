@@ -269,8 +269,30 @@ def process_tracks(lib, tracks, log):
         # Try some other non-standard replacements
         # TODO: generalize these replacements, and/or have the user put them in an external file
         if song is None:
+            log.debug("no title match yet, trying some different abbreviation styles")
+            title = title.replace(' Part 1', ', Pt. One')
+            title = title.replace(' Part 2', ', Pt. Two')
+            title = title.replace(' Part 2 & 3', ', Pts. Two & Three')
+            query = dbcore.AndQuery(
+                [
+                    dbcore.query.SubstringQuery("artist", artist),
+                    dbcore.query.SubstringQuery("title", title),
+                ]
+            )
+            song = lib.items(query).get()
+        if song is None:
             log.debug("no title match yet, replacing with alternate dash character")
             title = title.replace('-', '‐')
+            query = dbcore.AndQuery(
+                [
+                    dbcore.query.SubstringQuery("artist", artist),
+                    dbcore.query.SubstringQuery("title", title),
+                ]
+            )
+            song = lib.items(query).get()
+        if song is None:
+            log.debug("no title match yet, replacing dash character but the other way around")
+            title = title.replace('‐', '-')
             query = dbcore.AndQuery(
                 [
                     dbcore.query.SubstringQuery("artist", artist),
@@ -291,18 +313,6 @@ def process_tracks(lib, tracks, log):
         if song is None:
             log.debug("no title match yet, add spaces around forward slashes")
             title = title.replace('/', ' / ')
-            query = dbcore.AndQuery(
-                [
-                    dbcore.query.SubstringQuery("artist", artist),
-                    dbcore.query.SubstringQuery("title", title),
-                ]
-            )
-            song = lib.items(query).get()
-        if song is None:
-            log.debug("no title match yet, trying some different abbreviation styles")
-            title = title.replace(' Part 1', ', Pt. One')
-            title = title.replace(' Part 2', ', Pt. Two')
-            title = title.replace(' Part 2 & 3', ', Pts. Two & Three')
             query = dbcore.AndQuery(
                 [
                     dbcore.query.SubstringQuery("artist", artist),
