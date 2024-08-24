@@ -269,14 +269,17 @@ def process_tracks(lib, tracks, log):
         # Try some other non-standard replacements
         # TODO: generalize these replacements, and/or have the user put them in an external file
         if song is None:
-            log.debug("no title match yet, trying a query for a custom match")
-            query = dbcore.AndQuery(
-                [
-                    dbcore.query.SubstringQuery("artist", artist),
-                    dbcore.query.SubstringQuery("title_lastimport", title),
-                ]
-            )
-            song = lib.items(query).get()
+            # log.debug("no title match yet, trying a query for a custom match")
+            # query = dbcore.AndQuery(
+            #     [
+            #         dbcore.query.SubstringQuery("artist", artist),
+            #         dbcore.query.SubstringQuery("title_lastimport", title),
+            #     ]
+            # )
+            # song = lib.items(query).get()
+            # TODO: do this in a different way, because "title_lastimport" is a flexible attribute and cannot be queried as a SQLite DB Column !!!
+            # NOTE: here is a way to find all items in the library with the "title_lastimport" flexible attr set: beet list 'title_lastimport::^.+$'
+            pass
         if song is None:
             log.debug("no title match yet, trying some different abbreviation styles")
             title = title.replace(' Part 1', ', Pt. One')
