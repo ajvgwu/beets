@@ -34,7 +34,24 @@ class ListenBrainzPlugin(BeetsPlugin):
             self._lbupdate(lib, self._log)
 
         lbupdate_cmd.func = func
-        return [lbupdate_cmd]
+
+        updatelistens_cmd = ui.Subcommand(
+            'lbupdatelistens', help=f'Fetch top tracks from {self.data_source} and update listen_count')
+        updatelistens_cmd.parser.add_option(
+            '-c', '--count', type='int', dest='count',
+            help='number of top tracks to fetch')
+        updatelistens_cmd.parser.add_option(
+            '-o', '--offset', type='int', dest='offset',
+            help='number of top tracks to fetch')
+        def updatelistens_func(lib, opts, args):
+            if opts.count is not None:
+                self.config['count'] = opts.count
+            if opts.offset is not None:
+                self.config['offset'] = opts.offset
+            self._lb_update_listens(lib, self._log)
+        updatelistens_cmd.func = updatelistens_func
+
+        return [lbupdate_cmd, updatelistens_cmd]
 
     def _lbupdate(self, lib, log):
         """Obtain view count from Listenbrainz."""
@@ -50,6 +67,111 @@ class ListenBrainzPlugin(BeetsPlugin):
         log.info("... done!")
         log.info("{0} unknown play-counts", unknown_total)
         log.info("{0} play-counts imported", found_total)
+
+    def _lb_update_listens(self, lib, log):
+        param_count = self.config['count']
+        param_offset = self.config['offset']
+        param_range = 'all_time'
+
+        request_url = f'{self.ROOT}/stats/user/{self.username}/recordings'
+        request_params = {
+            k: v
+            for k, v in {
+                'count': param_count,
+                'offset': param_offset,
+                'range': param_range,
+            }.items()
+            if v is not None
+        }
+        response = self._make_request(request_url, request_params)
+        if response is None:
+            log.error(f'no response to request, url={url}')
+            return
+
+        response_payload = response['payload'] if 'payload' in response else None
+        if response_payload is None:
+            log.error(f'no payload in response: {str(response)}')
+            return
+
+        # Extract results from payload
+        payload_count = response_payload['count']
+        payload_offset = response_payload['offset']
+        payload_range = response_payload['range']
+        payload_recordings = response_payload['recordings']
+
+        # Check for consistency, warn about any mismatches
+        num_recordings = len(payload_recordings)
+        if payload_count != param_count or num_recordings != param_count:
+            log.warning(f'response count does not match request, param_count={param_count}, payload_count={payload_count}, num_recordings={num_recordings}')
+        if payload_offset != param_offset:
+            log.warning(f'response offset does not match request, param_offset={param_offset}, payload_offset={payload_offset}')
+        if payload_range != param_range:
+            log.warning(f'response range does not match request, param_range={param_range}, payload_range={payload_range}')
+
+        # Loop through recordings
+        total_found = 0
+        total_updated = 0
+        for recording in payload_recordings:
+            # Extract listen_count for current recording
+            listen_count = None
+            if 'listen_count' in recording:
+                listen_count = recording['listen_count']
+            if listen_count is None:
+                log.debug(f'no listen_count in recording: {str(recording)}')
+                continue
+
+            # Use recording metadata to look up current song in beets library
+            lib_song = None
+
+            # Extract MusicBrainz ID for current recording
+            recording_mbid = recording['recording_mbid'] if 'recording_mbid' in recording else None
+            if recording_mbid is not None:
+                query = dbcore.query.MatchQuery('mb_trackid', recording_mbid)
+                lib_song = lib.items(query).get()
+
+            # Fallback to looking up song using artist/album/track names
+            if lib_song is None:
+                track_name = recording['track_name'] if 'track_name' in recording else None
+                if track_name is None:
+                    log.error(f'cannot look up song with recording_mbid={recording_mbid} and track_name={track_name}')
+                    continue
+
+                artist = recording['artist_name'] if 'artist_name' in recording else None
+                album = recording['release_name'] if 'release_name' in recording else None
+                if artist is None and album is None:
+                    log.error('cannot look up song with artist_name={artist} and release_name={album}')
+                    continue
+
+                # Construct and execute the query
+                query_parts = [dbcore.query.SubstringQuery('title', track_name)]
+                if artist is not None:
+                    query_parts.append(dbcore.query.SubstringQuery('artist', artist))
+                if album is not None:
+                    query_parts.append(dbcore.query.SubstringQuery('album', album))
+                query = dbcore.AndQuery(query_parts)
+                lib_song = lib.items(query).get()
+
+            # Check whether we found a matching song item in the beets library
+            if lib_song is None:
+                log.error(f'could not look up song for recording: {str(recording)}')
+                continue
+            log.debug(f'found song: {song.artist} - {song.album} - {song.title}')
+            total_found += 1
+
+            # Check whether listen_count needs to be updated
+            old_listen_count = int(song.get('listen_count', 0))
+            if listen_count <= old_listen_count:
+                log.debug(f'no update needed to listen_count: {listen_count} <= {old_listen_count}')
+                continue
+
+            # Update the listen_count attribute
+            log.debug(f'updating listen_count: {old_listen_count} to {listen_count}')
+            song['listen_count'] = listen_count
+            song.store()
+            total_updated += 1
+
+        # Print a summary
+        log.info(f'found {total_found} of {num_recordings} recordings, updated listen_count for {total_updated} items')
 
     def _make_request(self, url, params=None):
         """Makes a request to the ListenBrainz API."""
