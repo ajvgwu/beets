@@ -266,6 +266,41 @@ def process_tracks(lib, tracks, log):
         # TODO: try by dropping all non-alphanumeric chars from title ???
         # e.g., 'How/about/this?' --> 'how about this'
 
+        # Try some other non-standard replacements
+        # TODO: generalize these replacements, and/or have the user put them in an external file
+        if song is None:
+            log.debug("no title match yet, replacing with alternate dash character")
+            title = title.replace('‐', '-')
+            query = dbcore.AndQuery(
+                [
+                    dbcore.query.SubstringQuery("artist", artist),
+                    dbcore.query.SubstringQuery("title", title),
+                ]
+            )
+            song = lib.items(query).get()
+        if song is None:
+            log.debug("no title match yet, adding spaces around forward slashes")
+            title = title.replace('/', ' / ')
+            query = dbcore.AndQuery(
+                [
+                    dbcore.query.SubstringQuery("artist", artist),
+                    dbcore.query.SubstringQuery("title", title),
+                ]
+            )
+            song = lib.items(query).get()
+        if song is None:
+            log.debug("no title match yet, trying some different abbreviation styles")
+            title = title.replace(' Part 1', ', Pt. One')
+            title = title.replace(' Part 2 & 3', ', Pts. Two & Three')
+            query = dbcore.AndQuery(
+                [
+                    dbcore.query.SubstringQuery("artist", artist),
+                    dbcore.query.SubstringQuery("title", title),
+                ]
+            )
+            song = lib.items(query).get()
+
+
         # Last resort, try just replacing to utf-8 quote
         if song is None:
             title = title.replace("'", "\u2019")
