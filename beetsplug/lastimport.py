@@ -273,6 +273,7 @@ def process_tracks(lib, tracks, log):
             title = title.replace(' Part 1', ', Pt. One')
             title = title.replace(' Part 2', ', Pt. Two')
             title = title.replace(' Part 2 & 3', ', Pts. Two & Three')
+            title = title.replace(', Pt. Two & 3', ', Pts. Two & Three')
             query = dbcore.AndQuery(
                 [
                     dbcore.query.SubstringQuery("artist", artist),
@@ -313,6 +314,16 @@ def process_tracks(lib, tracks, log):
         if song is None:
             log.debug("no title match yet, add spaces around forward slashes")
             title = title.replace('/', ' / ')
+            query = dbcore.AndQuery(
+                [
+                    dbcore.query.SubstringQuery("artist", artist),
+                    dbcore.query.SubstringQuery("title", title),
+                ]
+            )
+            song = lib.items(query).get()
+        if song is None:
+            log.debug("no title match yet, remove commas")
+            title = title.replace(',', '')
             query = dbcore.AndQuery(
                 [
                     dbcore.query.SubstringQuery("artist", artist),
