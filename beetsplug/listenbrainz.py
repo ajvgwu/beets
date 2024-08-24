@@ -115,7 +115,7 @@ class ListenBrainzPlugin(BeetsPlugin):
             if 'listen_count' in recording:
                 listen_count = recording['listen_count']
             if listen_count is None:
-                log.warning(f'no listen_count in recording: {str(recording)}')
+                log.warning(f'no listen_count in recording: {str(recording.text)}')
                 continue
 
             # Use recording metadata to look up current song in beets library
@@ -127,32 +127,31 @@ class ListenBrainzPlugin(BeetsPlugin):
                 query = dbcore.query.MatchQuery('mb_trackid', recording_mbid)
                 lib_song = lib.items(query).get()
 
-            # TODO: determine whether we ever need the following...
-            # # Fallback to looking up song using artist/album/track names
-            # if lib_song is None:
-            #     track_name = recording['track_name'] if 'track_name' in recording else None
-            #     if track_name is None:
-            #         log.error(f'cannot look up song with recording_mbid={recording_mbid} and track_name={track_name}')
-            #         continue
+            # Fallback to looking up song using artist/album/track names
+            if lib_song is None:
+                track_name = recording['track_name'] if 'track_name' in recording else None
+                if track_name is None:
+                    log.error(f'cannot look up song with recording_mbid={recording_mbid} and track_name={track_name}')
+                    continue
 
-            #     artist = recording['artist_name'] if 'artist_name' in recording else None
-            #     album = recording['release_name'] if 'release_name' in recording else None
-            #     if artist is None and album is None:
-            #         log.error('cannot look up song with artist_name={artist} and release_name={album}')
-            #         continue
+                artist = recording['artist_name'] if 'artist_name' in recording else None
+                album = recording['release_name'] if 'release_name' in recording else None
+                if artist is None and album is None:
+                    log.error('cannot look up song with artist_name={artist} and release_name={album}')
+                    continue
 
-            #     # Construct and execute the query
-            #     query_parts = [dbcore.query.SubstringQuery('title', track_name)]
-            #     if artist is not None:
-            #         query_parts.append(dbcore.query.SubstringQuery('artist', artist))
-            #     if album is not None:
-            #         query_parts.append(dbcore.query.SubstringQuery('album', album))
-            #     query = dbcore.AndQuery(query_parts)
-            #     lib_song = lib.items(query).get()
+                # Construct and execute the query
+                query_parts = [dbcore.query.SubstringQuery('title', track_name)]
+                if artist is not None:
+                    query_parts.append(dbcore.query.SubstringQuery('artist', artist))
+                if album is not None:
+                    query_parts.append(dbcore.query.SubstringQuery('album', album))
+                query = dbcore.AndQuery(query_parts)
+                lib_song = lib.items(query).get()
 
             # Check whether we found a matching song item in the beets library
             if lib_song is None:
-                log.error(f'could not look up song for recording: {str(recording)}')
+                log.error(f'could not look up song for recording: {str(recording.text)}')
                 continue
             log.debug(f'found song: {lib_song.artist} - {lib_song.album} - {lib_song.title}')
             total_found += 1
