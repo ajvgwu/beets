@@ -116,7 +116,7 @@ class ListenBrainzPlugin(BeetsPlugin):
             if 'listen_count' in recording:
                 listen_count = recording['listen_count']
             if listen_count is None:
-                log.warning(f'no listen_count in recording_idx={recording_idx}')
+                log.warning(f'no listen_count in recording_idx={recording_idx}, offset={payload_offset}')
                 continue
 
             # Use recording metadata to look up current song in beets library
@@ -152,7 +152,7 @@ class ListenBrainzPlugin(BeetsPlugin):
 
             # Check whether we found a matching song item in the beets library
             if lib_song is None:
-                log.error(f'could not look up song for recording_idx={recording_idx}')
+                log.error(f'could not look up song for recording_idx={recording_idx}, offset={payload_offset}')
                 continue
             log.debug(f'found song: {lib_song.artist} - {lib_song.album} - {lib_song.title}')
             total_found += 1
