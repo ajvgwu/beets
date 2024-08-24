@@ -114,7 +114,7 @@ class ListenBrainzPlugin(BeetsPlugin):
             recording = payload_recordings[recording_idx]
             listen_count = None
             if 'listen_count' in recording:
-                listen_count = recording['listen_count']
+                listen_count = int(recording['listen_count'])
             if listen_count is None:
                 log.warning(f'no listen_count in recording_idx={recording_idx}, offset={payload_offset}')
                 continue
@@ -162,6 +162,9 @@ class ListenBrainzPlugin(BeetsPlugin):
             if listen_count <= old_listen_count:
                 log.debug(f'no update needed to listen_count: {listen_count} <= {old_listen_count}')
                 continue
+
+            # TODO: what about summing up multiple listen_counts if different LB recordings refer to the same song in the beets library ???
+            # TODO: this might be tricky, if someone wants to page through LB results in small batches (using count/offset) !!!
 
             # Update the listen_count attribute
             log.debug(f'updating listen_count: {old_listen_count} to {listen_count}')
