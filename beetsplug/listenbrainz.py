@@ -38,16 +38,16 @@ class ListenBrainzPlugin(BeetsPlugin):
         updatelistens_cmd = ui.Subcommand(
             'lbupdatelistens', help=f'Fetch top tracks from {self.data_source} and update listen_count')
         updatelistens_cmd.parser.add_option(
-            '-c', '--count', type='int', dest='count',
+            '-c', '--count', type='int', dest='opt_count',
             help='number of top tracks to fetch')
         updatelistens_cmd.parser.add_option(
-            '-o', '--offset', type='int', dest='offset',
-            help='number of top tracks to fetch')
+            '-o', '--offset', type='int', dest='opt_offset',
+            help='number of entries to skip from the beginning')
         def updatelistens_func(lib, opts, args):
-            if opts.count is not None:
-                self.config['count'] = opts.count
-            if opts.offset is not None:
-                self.config['offset'] = opts.offset
+            if opts.opt_count is not None:
+                self.config['opt_count'] = opts.opt_count
+            if opts.opt_offset is not None:
+                self.config['opt_offset'] = opts.opt_offset
             self._lb_update_listens(lib, self._log)
         updatelistens_cmd.func = updatelistens_func
 
@@ -69,8 +69,8 @@ class ListenBrainzPlugin(BeetsPlugin):
         log.info("{0} play-counts imported", found_total)
 
     def _lb_update_listens(self, lib, log):
-        param_count = self.config['count']
-        param_offset = self.config['offset']
+        param_count = self.config['opt_count']
+        param_offset = self.config['opt_offset']
         param_range = 'all_time'
 
         request_url = f'{self.ROOT}/stats/user/{self.username}/recordings'
