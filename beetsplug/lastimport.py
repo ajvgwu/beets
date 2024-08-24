@@ -270,7 +270,7 @@ def process_tracks(lib, tracks, log):
         # TODO: generalize these replacements, and/or have the user put them in an external file
         if song is None:
             log.debug("no title match yet, replacing with alternate dash character")
-            title = title.replace('‐', '-')
+            title = title.replace('-', '‐')
             query = dbcore.AndQuery(
                 [
                     dbcore.query.SubstringQuery("artist", artist),
@@ -279,7 +279,17 @@ def process_tracks(lib, tracks, log):
             )
             song = lib.items(query).get()
         if song is None:
-            log.debug("no title match yet, adding spaces around forward slashes")
+            log.debug("no title match yet, remove spaces surrounding forward slashes")
+            title = title.replace(' / ', '/')
+            query = dbcore.AndQuery(
+                [
+                    dbcore.query.SubstringQuery("artist", artist),
+                    dbcore.query.SubstringQuery("title", title),
+                ]
+            )
+            song = lib.items(query).get()
+        if song is None:
+            log.debug("no title match yet, add spaces around forward slashes")
             title = title.replace('/', ' / ')
             query = dbcore.AndQuery(
                 [
