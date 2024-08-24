@@ -301,6 +301,7 @@ def process_tracks(lib, tracks, log):
         if song is None:
             log.debug("no title match yet, trying some different abbreviation styles")
             title = title.replace(' Part 1', ', Pt. One')
+            title = title.replace(' Part 2', ', Pt. Two')
             title = title.replace(' Part 2 & 3', ', Pts. Two & Three')
             query = dbcore.AndQuery(
                 [
