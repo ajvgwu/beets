@@ -2,7 +2,6 @@
 
 import datetime
 
-import json
 import musicbrainzngs
 import requests
 
@@ -110,13 +109,14 @@ class ListenBrainzPlugin(BeetsPlugin):
         # Loop through recordings
         total_found = 0
         total_updated = 0
-        for recording in payload_recordings:
+        for recording_idx in range(0, num_recordings):
             # Extract listen_count for current recording
+            recording = payload_recordings[recording_idx]
             listen_count = None
             if 'listen_count' in recording:
                 listen_count = recording['listen_count']
             if listen_count is None:
-                log.warning(f'no listen_count in recording: {json.dumps(recording)}')
+                log.warning(f'no listen_count in recording_idx={recording_idx}')
                 continue
 
             # Use recording metadata to look up current song in beets library
@@ -152,7 +152,7 @@ class ListenBrainzPlugin(BeetsPlugin):
 
             # Check whether we found a matching song item in the beets library
             if lib_song is None:
-                log.error(f'could not look up song for recording: {json.dumps(recording)}')
+                log.error(f'could not look up song for recording_idx={recording_idx}')
                 continue
             log.debug(f'found song: {lib_song.artist} - {lib_song.album} - {lib_song.title}')
             total_found += 1
