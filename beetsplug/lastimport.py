@@ -300,7 +300,6 @@ def process_tracks(lib, tracks, log):
             )
             song = lib.items(query).get()
 
-
         # Last resort, try just replacing to utf-8 quote
         if song is None:
             title = title.replace("'", "\u2019")
