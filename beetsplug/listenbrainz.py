@@ -5,7 +5,7 @@ import datetime
 import musicbrainzngs
 import requests
 
-from beets import config, ui
+from beets import config, ui, dbcore
 from beets.plugins import BeetsPlugin
 from beetsplug.lastimport import process_tracks
 
@@ -83,7 +83,7 @@ class ListenBrainzPlugin(BeetsPlugin):
         }
         response = self._make_request(request_url, request_params)
         if response is None:
-            log.error(f'no response to request, url={url}')
+            log.error(f'no response to request, url={request_url}, params={str(request_params)}')
             return
 
         response_payload = response['payload'] if 'payload' in response else None
@@ -99,11 +99,11 @@ class ListenBrainzPlugin(BeetsPlugin):
 
         # Check for consistency, warn about any mismatches
         num_recordings = len(payload_recordings)
-        if payload_count != param_count or num_recordings != param_count:
+        if param_count is not None and (payload_count != param_count or num_recordings != param_count):
             log.warning(f'response count does not match request, param_count={param_count}, payload_count={payload_count}, num_recordings={num_recordings}')
-        if payload_offset != param_offset:
+        if param_offset is not None and payload_offset != param_offset:
             log.warning(f'response offset does not match request, param_offset={param_offset}, payload_offset={payload_offset}')
-        if payload_range != param_range:
+        if param_range is not None and payload_range != param_range:
             log.warning(f'response range does not match request, param_range={param_range}, payload_range={payload_range}')
 
         # Loop through recordings
@@ -115,7 +115,7 @@ class ListenBrainzPlugin(BeetsPlugin):
             if 'listen_count' in recording:
                 listen_count = recording['listen_count']
             if listen_count is None:
-                log.debug(f'no listen_count in recording: {str(recording)}')
+                log.warning(f'no listen_count in recording: {str(recording)}')
                 continue
 
             # Use recording metadata to look up current song in beets library
@@ -127,45 +127,46 @@ class ListenBrainzPlugin(BeetsPlugin):
                 query = dbcore.query.MatchQuery('mb_trackid', recording_mbid)
                 lib_song = lib.items(query).get()
 
-            # Fallback to looking up song using artist/album/track names
-            if lib_song is None:
-                track_name = recording['track_name'] if 'track_name' in recording else None
-                if track_name is None:
-                    log.error(f'cannot look up song with recording_mbid={recording_mbid} and track_name={track_name}')
-                    continue
+            # TODO: determine whether we ever need the following...
+            # # Fallback to looking up song using artist/album/track names
+            # if lib_song is None:
+            #     track_name = recording['track_name'] if 'track_name' in recording else None
+            #     if track_name is None:
+            #         log.error(f'cannot look up song with recording_mbid={recording_mbid} and track_name={track_name}')
+            #         continue
 
-                artist = recording['artist_name'] if 'artist_name' in recording else None
-                album = recording['release_name'] if 'release_name' in recording else None
-                if artist is None and album is None:
-                    log.error('cannot look up song with artist_name={artist} and release_name={album}')
-                    continue
+            #     artist = recording['artist_name'] if 'artist_name' in recording else None
+            #     album = recording['release_name'] if 'release_name' in recording else None
+            #     if artist is None and album is None:
+            #         log.error('cannot look up song with artist_name={artist} and release_name={album}')
+            #         continue
 
-                # Construct and execute the query
-                query_parts = [dbcore.query.SubstringQuery('title', track_name)]
-                if artist is not None:
-                    query_parts.append(dbcore.query.SubstringQuery('artist', artist))
-                if album is not None:
-                    query_parts.append(dbcore.query.SubstringQuery('album', album))
-                query = dbcore.AndQuery(query_parts)
-                lib_song = lib.items(query).get()
+            #     # Construct and execute the query
+            #     query_parts = [dbcore.query.SubstringQuery('title', track_name)]
+            #     if artist is not None:
+            #         query_parts.append(dbcore.query.SubstringQuery('artist', artist))
+            #     if album is not None:
+            #         query_parts.append(dbcore.query.SubstringQuery('album', album))
+            #     query = dbcore.AndQuery(query_parts)
+            #     lib_song = lib.items(query).get()
 
             # Check whether we found a matching song item in the beets library
             if lib_song is None:
                 log.error(f'could not look up song for recording: {str(recording)}')
                 continue
-            log.debug(f'found song: {song.artist} - {song.album} - {song.title}')
+            log.debug(f'found song: {lib_song.artist} - {lib_song.album} - {lib_song.title}')
             total_found += 1
 
             # Check whether listen_count needs to be updated
-            old_listen_count = int(song.get('listen_count', 0))
+            old_listen_count = int(lib_song.get('listen_count', 0))
             if listen_count <= old_listen_count:
                 log.debug(f'no update needed to listen_count: {listen_count} <= {old_listen_count}')
                 continue
 
             # Update the listen_count attribute
             log.debug(f'updating listen_count: {old_listen_count} to {listen_count}')
-            song['listen_count'] = listen_count
-            song.store()
+            lib_song['listen_count'] = listen_count
+            lib_song.store()
             total_updated += 1
 
         # Print a summary
