@@ -95,13 +95,13 @@ class ListenBrainzPlugin(BeetsPlugin):
         if response_payload is None:
             log.error(f'no payload in response: {str(response)}')
             return
-        log.debug('got response with payload: ' + str(response_payload).replace('{', '{{').replace('}', '}}'))
 
         # Extract results from payload
         payload_count = response_payload['count']
         payload_offset = response_payload['offset']
         payload_range = response_payload['range']
         payload_recordings = response_payload['recordings']
+        log.debug(f'got response payload with count={payload_count}')
 
         # Check for consistency, warn about any mismatches
         num_recordings = len(payload_recordings)
@@ -118,6 +118,7 @@ class ListenBrainzPlugin(BeetsPlugin):
         for recording_idx in range(0, num_recordings):
             # Extract listen_count for current recording
             recording = payload_recordings[recording_idx]
+            log.trace(f'processing entry for recording: {str(recording).replace('{', '{{').replace('}', '}}')}')
             listen_count = None
             if 'listen_count' in recording:
                 listen_count = int(recording['listen_count'])
