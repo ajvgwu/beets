@@ -118,7 +118,6 @@ class ListenBrainzPlugin(BeetsPlugin):
         for recording_idx in range(0, num_recordings):
             # Extract listen_count for current recording
             recording = payload_recordings[recording_idx]
-            log.trace(f'processing entry for recording: {str(recording).replace('{', '{{').replace('}', '}}')}')
             listen_count = None
             if 'listen_count' in recording:
                 listen_count = int(recording['listen_count'])
@@ -149,6 +148,8 @@ class ListenBrainzPlugin(BeetsPlugin):
                 if artist is None and album is None:
                     log.error('cannot look up song with artist_name={artist} and release_name={album}')
                     continue
+
+                log.debug(f'attempting lookup for: {artist} - {album} - {track_name} with recording_mbid={recording_mbid}')
 
                 # Construct and execute the query
                 query_parts = [dbcore.query.SubstringQuery('title', track_name)]
