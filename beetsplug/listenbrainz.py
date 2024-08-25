@@ -95,6 +95,7 @@ class ListenBrainzPlugin(BeetsPlugin):
         if response_payload is None:
             log.error(f'no payload in response: {str(response)}')
             return
+        log.debug('got response with payload: ' + str(response_payload).replace('{', '{{').replace('}', '}}'))
 
         # Extract results from payload
         payload_count = response_payload['count']
