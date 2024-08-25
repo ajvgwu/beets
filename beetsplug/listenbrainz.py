@@ -49,7 +49,7 @@ class ListenBrainzPlugin(BeetsPlugin):
             '-o', '--offset', type='int', dest='offset',
             help='number of entries to skip from the beginning')
         updatelistens_cmd.parser.add_option(
-            '-f', '--remapattr', type='str', dest='remapattr',
+            '-r', '--remapattr', type='str', dest='remapattr',
             help='name of beets field/attribute that contains mb_trackid remaps for ListenBrainz scrobbles')
         def updatelistens_func(lib, opts, args):
             opt_count = opts.count if opts.count is not None else None
