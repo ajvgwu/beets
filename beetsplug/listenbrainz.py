@@ -120,8 +120,9 @@ class ListenBrainzPlugin(BeetsPlugin):
             listen_count = None
             if 'listen_count' in recording:
                 listen_count = int(recording['listen_count'])
+                log.debug(f'for recording_idx={payload_offset}+{recording_idx}, got listen_count={listen_count}')
             if listen_count is None:
-                log.warning(f'no listen_count in recording_idx={recording_idx}, offset={payload_offset}')
+                log.warning(f'no listen_count in recording_idx={payload_offset}+{recording_idx}')
                 continue
 
             # Use recording metadata to look up current song in beets library
@@ -135,6 +136,7 @@ class ListenBrainzPlugin(BeetsPlugin):
 
             # Fallback to looking up song using artist/album/track names
             if lib_song is None:
+                log.debug('could not find song by MusicBrainz ID, falling back to title/artist/album names')
                 track_name = recording['track_name'] if 'track_name' in recording else None
                 if track_name is None:
                     log.error(f'cannot look up song with recording_mbid={recording_mbid} and track_name={track_name}')
@@ -155,9 +157,27 @@ class ListenBrainzPlugin(BeetsPlugin):
                 query = dbcore.AndQuery(query_parts)
                 lib_song = lib.items(query).get()
 
+                if lib_song is None and album is not None and artist is not None:
+                    # Look up using just artist/track names (i.e., do not include album name in the query)
+                    log.debug('could not find song by title+artist+album, trying title+artist')
+                    query = dbcore.AndQuery([
+                        dbcore.query.SubstringQuery('title', track_name),
+                        dbcore.query.SubstringQuery('artist', artist)
+                    ])
+                    lib_song = lib.items(query).get()
+
+                    if lib_song is None:
+                        # Look up using just album/track names (i.e., do not include artist name in the query)
+                        log.debug('could not find song by title+artist, trying title+album')
+                        query = dbcore.AndQuery([
+                            dbcore.query.SubstringQuery('title', track_name),
+                            dbcore.query.SubstringQuery('album', album)
+                        ])
+                        lib_song = lib.items(query).get()
+
             # Check whether we found a matching song item in the beets library
             if lib_song is None:
-                log.error(f'could not look up song for recording_idx={recording_idx}, offset={payload_offset}')
+                log.error(f'could not find song for recording_idx={payload_offset}+{recording_idx}')
                 continue
             log.debug(f'found song: {lib_song.artist} - {lib_song.album} - {lib_song.title}')
             total_found += 1
