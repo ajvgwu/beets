@@ -181,7 +181,7 @@ class ListenBrainzPlugin(BeetsPlugin):
             # If nothing else worked, try querying for a beets flex attr called 'lb_trackid_remap'
             # NOTE: add a mapping to a song in your library like this:
             #    $ beet modify --nomove --nowrite 'mb_trackid:=<trackid in your library>' 'lb_trackid_remap=<trackid on listenbrainz>'
-            if song is None:
+            if lib_song is None:
                 log.debug('cound not find song yet, trying query for flex attr "lb_trackid_remap"')
                 query = f'lb_trackid_remap:={recording_mbid}'
                 lib_song = lib.items(query).get()
