@@ -49,13 +49,13 @@ class ListenBrainzPlugin(BeetsPlugin):
             '-o', '--offset', type='int', dest='offset',
             help='number of entries to skip from the beginning')
         updatelistens_cmd.parser.add_option(
-            '-f', '--flexattr', type='str', dest='flexattr',
-            help='beets flexible attribute that contains trackid remaps for ListenBrainz scrobbles')
+            '-f', '--remapattr', type='str', dest='remapattr',
+            help='name of beets field/attribute that contains mb_trackid remaps for ListenBrainz scrobbles')
         def updatelistens_func(lib, opts, args):
             opt_count = opts.count if opts.count is not None else None
             opt_offset = opts.offset if opts.offset is not None else None
-            opt_flexattr = opts.flexattr if opts.flexattr is not None else None
-            self._lb_update_listens(lib, self._log, count=opt_count, offset=opt_offset, flexattr=opt_flexattr)
+            opt_remapattr = opts.remapattr if opts.remapattr is not None else None
+            self._lb_update_listens(lib, self._log, count=opt_count, offset=opt_offset, remapattr=opt_remapattr)
         updatelistens_cmd.func = updatelistens_func
 
         return [lbupdate_cmd, updatelistens_cmd]
@@ -75,7 +75,7 @@ class ListenBrainzPlugin(BeetsPlugin):
         log.info("{0} unknown play-counts", unknown_total)
         log.info("{0} play-counts imported", found_total)
 
-    def _lb_update_listens(self, lib, log, count=None, offset=None, flexattr=None):
+    def _lb_update_listens(self, lib, log, count=None, offset=None, remapattr=None):
         param_count = count
         param_offset = offset
         param_range = 'all_time'
@@ -182,13 +182,13 @@ class ListenBrainzPlugin(BeetsPlugin):
                         ])
                         lib_song = lib.items(query).get()
 
-            # If nothing else worked, try querying for a beets flex attr that contains ListenBrainz/MusicBrainz trackid remaps
+            # If nothing else worked, try querying for a beets field/attr that contains ListenBrainz/MusicBrainz trackid remaps
             # NOTE: add a mapping to a song in your library like this:
             # NOTE:   $ beet modify --nomove --nowrite 'mb_trackid:=<trackid in your library>' 'lb_trackid_remap=<trackid on listenbrainz>'
-            # NOTE: and then call this subcommand with the option: --flexattr 'lb_trackid_remap'
-            if lib_song is None and flexattr is not None:
-                log.debug(f'cound not find song yet, trying query for flexattr={flexattr}')
-                query = f'{flexattr}:={recording_mbid}'
+            # NOTE: and then call this subcommand with the option: --remapattr 'lb_trackid_remap'
+            if lib_song is None and remapattr is not None:
+                log.debug(f'cound not find song yet, trying query for remapattr={remapattr}')
+                query = f'{remapattr}:={recording_mbid}'
                 lib_song = lib.items(query).get()
 
             # Check whether we found a matching song item in the beets library
