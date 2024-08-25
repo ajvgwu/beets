@@ -188,9 +188,13 @@ class ListenBrainzPlugin(BeetsPlugin):
 
             # Check whether we found a matching song item in the beets library
             if lib_song is None:
-                song_hint = f' at recording_idx={payload_offset}+{recording_idx}'
+                artist_name = recording['artist_name'] if 'artist_name' in recording else None
+                track_name = recording['track_name'] if 'track_name' in recording else None
+                song_hint = f' at offset+idx={payload_offset}+{recording_idx}'
+                if artist_name is not None and track_name is not None:
+                    song_hint += f': {artist_name} - {track_name}'
                 if recording_mbid is not None:
-                    song_hint = f': https://musicbrainz.org/recording/{recording_mbid}'
+                    song_hint += f' (https://musicbrainz.org/recording/{recording_mbid})'
                 log.error(f'could not find song{song_hint}')
                 continue
             log.debug(f'found song: {lib_song.artist} - {lib_song.album} - {lib_song.title}')
