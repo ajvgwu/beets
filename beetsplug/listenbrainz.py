@@ -123,6 +123,7 @@ class ListenBrainzPlugin(BeetsPlugin):
         counts_nochange = 0
         counts_increased = 0
         listencount_increase_amount = 0
+        update_log = ''
         for recording_idx in range(0, num_recordings):
             # Extract listen_count for current recording
             recording = payload_recordings[recording_idx]
@@ -231,6 +232,7 @@ class ListenBrainzPlugin(BeetsPlugin):
             songs_updated += 1
             counts_increased += 1
             listencount_increase_amount += (listen_count - old_listen_count)
+            update_log += f'\n  {lib_song.artist} - {lib_song.album} - {lib_song.title}: {old_listen_count} -> {listen_count}'
 
         # Print a summary
         log.info(f'found {songs_found} of {num_recordings} recordings, updated listen_count for {songs_updated} items')
@@ -240,6 +242,7 @@ class ListenBrainzPlugin(BeetsPlugin):
         counts_nochange = 0
         counts_increased = 0
         listencount_increase_amount = 0
+        log.info('log of songs with increased listen_count:' + update_log)
 
     def _make_request(self, url, params=None):
         """Makes a request to the ListenBrainz API."""
