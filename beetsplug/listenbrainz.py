@@ -117,8 +117,12 @@ class ListenBrainzPlugin(BeetsPlugin):
             log.warning(f'response range does not match request, param_range={param_range}, payload_range={payload_range}')
 
         # Loop through recordings
-        total_found = 0
-        total_updated = 0
+        songs_found = 0
+        songs_updated = 0
+        counts_decreased = 0
+        counts_nochange = 0
+        counts_increased = 0
+        listencount_increase_amount = 0
         for recording_idx in range(0, num_recordings):
             # Extract listen_count for current recording
             recording = payload_recordings[recording_idx]
@@ -203,12 +207,16 @@ class ListenBrainzPlugin(BeetsPlugin):
                 log.error(f'could not find song{song_hint}')
                 continue
             log.debug(f'found song: {lib_song.artist} - {lib_song.album} - {lib_song.title}')
-            total_found += 1
+            songs_found += 1
 
             # Check whether listen_count needs to be updated
             old_listen_count = int(lib_song.get('listen_count', 0))
             if listen_count <= old_listen_count:
                 log.debug(f'no update needed to listen_count: {listen_count} <= {old_listen_count}')
+                if listen_count < old_listen_count:
+                    counts_decreased += 1
+                elif listen_count == old_listen_count:
+                    counts_nochange += 1
                 continue
 
             # TODO: what about summing up multiple listen_counts if different LB recordings refer to the same song in the beets library ???
@@ -218,10 +226,20 @@ class ListenBrainzPlugin(BeetsPlugin):
             log.debug(f'updating listen_count: {old_listen_count} to {listen_count}')
             lib_song['listen_count'] = listen_count
             lib_song.store()
-            total_updated += 1
+
+            # Update some stats
+            songs_updated += 1
+            counts_increased += 1
+            listencount_increase_amount += (listen_count - old_listen_count)
 
         # Print a summary
-        log.info(f'found {total_found} of {num_recordings} recordings, updated listen_count for {total_updated} items')
+        log.info(f'found {songs_found} of {num_recordings} recordings, updated listen_count for {songs_updated} items')
+        log.info(f'songs where listen_count decreased={counts_decreased}, nochange={counts_nochange}, increased={counts_increased}')
+        log.info(f'cumulative increase in listen_count during this run: {listencount_increase_amount}')
+        counts_decreased = 0
+        counts_nochange = 0
+        counts_increased = 0
+        listencount_increase_amount = 0
 
     def _make_request(self, url, params=None):
         """Makes a request to the ListenBrainz API."""
