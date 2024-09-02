@@ -215,6 +215,7 @@ class ListenBrainzPlugin(BeetsPlugin):
             if listen_count <= old_listen_count:
                 log.debug(f'no update needed to listen_count: {listen_count} <= {old_listen_count}')
                 if listen_count < old_listen_count:
+                    log.info(f'skipping update for listen_count that decreased from {old_listen_count} to {listen_count}: {lib_song.artist} - {lib_song.album} - {lib_song.title}')
                     counts_decreased += 1
                 elif listen_count == old_listen_count:
                     counts_nochange += 1
@@ -222,6 +223,7 @@ class ListenBrainzPlugin(BeetsPlugin):
 
             # TODO: what about summing up multiple listen_counts if different LB recordings refer to the same song in the beets library ???
             # TODO: this might be tricky, if someone wants to page through LB results in small batches (using count/offset) !!!
+            # TODO: if we look at all 1000 in one batch, then maybe we could loop through and keep a running sum for each song (by artist/title) !!!
 
             # Update the listen_count attribute
             log.debug(f'updating listen_count: {old_listen_count} to {listen_count}')
