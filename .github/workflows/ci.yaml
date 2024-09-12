@@ -34,10 +34,10 @@ jobs:
         run: |
           sudo apt update
           sudo apt install ffmpeg gobject-introspection libgirepository1.0-dev
-          poetry install --extras replaygain
+          poetry install --extras=replaygain --extras=reflink
 
       - name: Install Python dependencies
-        run: poetry install --only=main,test
+        run: poetry install --only=main,test --extras=autobpm
 
       - if: ${{ env.IS_MAIN_PYTHON != 'true' }}
         name: Test without coverage

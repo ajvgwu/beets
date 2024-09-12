@@ -42,7 +42,7 @@ from enum import Enum
 from functools import cached_property
 from io import StringIO
 from pathlib import Path
-from tempfile import mkdtemp, mkstemp
+from tempfile import gettempdir, mkdtemp, mkstemp
 from typing import Any, ClassVar
 from unittest.mock import patch
 
@@ -145,6 +145,20 @@ def has_program(cmd, args=["--version"]):
         return False
     else:
         return True
+
+
+def check_reflink_support(path: str) -> bool:
+    try:
+        import reflink
+    except ImportError:
+        return False
+
+    return reflink.supported_at(path)
+
+
+NEEDS_REFLINK = unittest.skipUnless(
+    check_reflink_support(gettempdir()), "no reflink support for libdir"
+)
 
 
 class TestHelper(_common.Assertions):
@@ -452,13 +466,13 @@ class PluginMixin:
     plugin: ClassVar[str]
     preload_plugin: ClassVar[bool] = True
 
-    def setUp(self):
-        super().setUp()
+    def setup_beets(self):
+        super().setup_beets()
         if self.preload_plugin:
             self.load_plugins()
 
-    def tearDown(self):
-        super().tearDown()
+    def teardown_beets(self):
+        super().teardown_beets()
         self.unload_plugins()
 
     def load_plugins(self, *plugins: str) -> None:
@@ -964,6 +978,7 @@ class AutotagStub:
             artist_id="artistid" + id,
             albumtype="soundtrack",
             data_source="match_source",
+            bandcamp_album_id="bc_url",
         )
 
 

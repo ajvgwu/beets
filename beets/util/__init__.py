@@ -13,6 +13,7 @@
 # included in all copies or substantial portions of the Software.
 
 """Miscellaneous utility functions."""
+
 from __future__ import annotations
 
 import errno
@@ -26,9 +27,10 @@ import subprocess
 import sys
 import tempfile
 import traceback
-from collections import Counter, namedtuple
+from collections import Counter
 from contextlib import suppress
 from enum import Enum
+from importlib import import_module
 from logging import Logger
 from multiprocessing.pool import ThreadPool
 from pathlib import Path
@@ -40,6 +42,7 @@ from typing import (
     Iterable,
     List,
     MutableSequence,
+    NamedTuple,
     Optional,
     Pattern,
     Sequence,
@@ -614,31 +617,33 @@ def reflink(
     Raise an `OSError` if `dest` already exists, unless `replace` is
     True. If `path` == `dest`, then do nothing.
 
-    If reflinking fails and `fallback` is enabled, try copying the file
-    instead. Otherwise, raise an error without trying a plain copy.
-
-    May raise an `ImportError` if the `reflink` module is not available.
+    If `fallback` is enabled, ignore errors and copy the file instead.
+    Otherwise, errors are re-raised as FilesystemError with an explanation.
     """
-    import reflink as pyreflink
-
     if samefile(path, dest):
         return
 
     if os.path.exists(syspath(dest)) and not replace:
-        raise FilesystemError("file exists", "rename", (path, dest))
+        raise FilesystemError("target exists", "rename", (path, dest))
+
+    if fallback:
+        with suppress(Exception):
+            return import_module("reflink").reflink(path, dest)
+        return copy(path, dest, replace)
 
     try:
-        pyreflink.reflink(path, dest)
-    except (NotImplementedError, pyreflink.ReflinkImpossibleError):
-        if fallback:
-            copy(path, dest, replace)
-        else:
-            raise FilesystemError(
-                "OS/filesystem does not support reflinks.",
-                "link",
-                (path, dest),
-                traceback.format_exc(),
-            )
+        import_module("reflink").reflink(path, dest)
+    except (ImportError, OSError):
+        raise
+    except Exception as exc:
+        msg = {
+            "EXDEV": "Cannot reflink across devices",
+            "EOPNOTSUPP": "Device does not support reflinks",
+        }.get(str(exc), "OS does not support reflinks")
+
+        raise FilesystemError(
+            msg, "reflink", (path, dest), traceback.format_exc()
+        ) from exc
 
 
 def unique_path(path: bytes) -> bytes:
@@ -847,7 +852,9 @@ def convert_command_args(args: List[bytes]) -> List[str]:
 
 
 # stdout and stderr as bytes
-CommandOutput = namedtuple("CommandOutput", ("stdout", "stderr"))
+class CommandOutput(NamedTuple):
+    stdout: bytes
+    stderr: bytes
 
 
 def command_output(
