@@ -20,12 +20,17 @@ New features:
 * :doc:`plugins/autobpm`: Add new configuration option ``beat_track_kwargs``
   which enables adjusting keyword arguments supplied to librosa's
   ``beat_track`` function call.
+* Beets now uses ``platformdirs`` to determine the default music directory.
+  This location varies between systems -- for example, users can configure it
+  on Unix systems via ``user-dirs.dirs(5)``.
 
 Bug fixes:
 
-* Improved naming of temporary files by separating the random part with the file extension.
-* Fixed the ``auto`` value for the :ref:`reflink` config option.
-* Fixed lyrics plugin only getting part of the lyrics from ``Genius.com`` :bug:`4815`
+* The detection of a "feat. X" part now also matches such parts if they are in
+  parentheses or brackets. :bug:`5436`
+* Improve naming of temporary files by separating the random part with the file extension.
+* Fix the ``auto`` value for the :ref:`reflink` config option.
+* Fix lyrics plugin only getting part of the lyrics from ``Genius.com`` :bug:`4815`
 * Album flexible fields are now correctly saved. For instance MusicBrainz external links
   such as `bandcamp_album_id` will be available on albums in addition to tracks.
   For albums already in your library, a re-import is required for the fields to be added.
@@ -34,6 +39,7 @@ Bug fixes:
   as a numpy array. Update ``librosa`` dependency constraint to prevent similar
   issues in the future.
   :bug:`5289`
+* :doc:`plugins/discogs`: Fix the ``TypeError`` when there is no description.
 
 For packagers:
 
@@ -235,9 +241,12 @@ New features:
 * Add support for `barcode` field.
   :bug:`3172`
 * :doc:`/plugins/smartplaylist`: Add new config option `smartplaylist.fields`.
+* :doc:`/plugins/fetchart`: Defer source removal config option evaluation to
+  the point where they are used really, supporting temporary config changes.
 
 Bug fixes:
 
+* :doc:`/plugins/deezer`: Improve requests error handling.
 * :doc:`/plugins/lastimport`: Improve error handling in the `process_tracks` function and enable it to be used with other plugins.
 * :doc:`/plugins/spotify`: Improve handling of ConnectionError.
 * :doc:`/plugins/deezer`: Improve Deezer plugin error handling and set requests timeout to 10 seconds.
