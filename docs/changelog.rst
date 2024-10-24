@@ -26,7 +26,9 @@ New features:
 
 Bug fixes:
 
-* The detection of a "feat. X" part now also matches such parts if they are in
+* :doc:`plugins/ftintitle`: The detection of a "feat. X" part in a song title does not produce any false
+  positives caused by words like "and" or "with" anymore. :bug:`5441`
+* :doc:`plugins/ftintitle`: The detection of a "feat. X" part now also matches such parts if they are in
   parentheses or brackets. :bug:`5436`
 * Improve naming of temporary files by separating the random part with the file extension.
 * Fix the ``auto`` value for the :ref:`reflink` config option.
@@ -40,6 +42,11 @@ Bug fixes:
   issues in the future.
   :bug:`5289`
 * :doc:`plugins/discogs`: Fix the ``TypeError`` when there is no description.
+* Remove single quotes from all SQL queries
+  :bug:`4709`
+* :doc:`plugins/lyrics`: Update ``tekstowo`` backend to fetch lyrics directly
+  since recent updates to their website made it unsearchable.
+  :bug:`5456`
 
 For packagers:
 
