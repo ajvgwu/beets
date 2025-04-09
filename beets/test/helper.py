@@ -20,9 +20,6 @@ information or mock the environment.
 
 - `has_program` checks the presence of a command on the system.
 
-- The `generate_album_info` and `generate_track_info` functions return
-  fixtures to be used when mocking the autotagger.
-
 - The `ImportSessionFixture` allows one to run importer code while
   controlling the interactions through code.
 
@@ -51,7 +48,7 @@ from mediafile import Image, MediaFile
 
 import beets
 import beets.plugins
-from beets import autotag, config, importer, logging, util
+from beets import autotag, importer, logging, util
 from beets.autotag.hooks import AlbumInfo, TrackInfo
 from beets.importer import ImportSession
 from beets.library import Album, Item, Library
@@ -156,12 +153,27 @@ def check_reflink_support(path: str) -> bool:
     return reflink.supported_at(path)
 
 
+class ConfigMixin:
+    @cached_property
+    def config(self) -> beets.IncludeLazyConfig:
+        """Base beets configuration for tests."""
+        config = beets.config
+        config.sources = []
+        config.read(user=False, defaults=True)
+
+        config["plugins"] = []
+        config["verbose"] = 1
+        config["ui"]["color"] = False
+        config["threaded"] = False
+        return config
+
+
 NEEDS_REFLINK = unittest.skipUnless(
     check_reflink_support(gettempdir()), "no reflink support for libdir"
 )
 
 
-class TestHelper(_common.Assertions):
+class TestHelper(_common.Assertions, ConfigMixin):
     """Helper mixin for high-level cli and plugin tests.
 
     This mixin provides methods to isolate beets' global state provide
@@ -187,8 +199,6 @@ class TestHelper(_common.Assertions):
         - ``libdir`` Path to a subfolder of ``temp_dir``, containing the
           library's media files. Same as ``config['directory']``.
 
-        - ``config`` The global configuration used by beets.
-
         - ``lib`` Library instance created with the settings from
           ``config``.
 
@@ -204,15 +214,6 @@ class TestHelper(_common.Assertions):
             },
         )
         self.env_patcher.start()
-
-        self.config = beets.config
-        self.config.sources = []
-        self.config.read(user=False, defaults=True)
-
-        self.config["plugins"] = []
-        self.config["verbose"] = 1
-        self.config["ui"]["color"] = False
-        self.config["threaded"] = False
 
         self.libdir = os.path.join(self.temp_dir, b"libdir")
         os.mkdir(syspath(self.libdir))
@@ -232,8 +233,6 @@ class TestHelper(_common.Assertions):
         self.io.restore()
         self.lib._close()
         self.remove_temp_dir()
-        beets.config.clear()
-        beets.config._materialized = False
 
     # Library fixtures methods
 
@@ -249,16 +248,15 @@ class TestHelper(_common.Assertions):
 
         The item is attached to the database from `self.lib`.
         """
-        item_count = self._get_item_count()
         values_ = {
             "title": "t\u00eftle {0}",
             "artist": "the \u00e4rtist",
             "album": "the \u00e4lbum",
-            "track": item_count,
+            "track": 1,
             "format": "MP3",
         }
         values_.update(values)
-        values_["title"] = values_["title"].format(item_count)
+        values_["title"] = values_["title"].format(1)
         values_["db"] = self.lib
         item = Item(**values_)
         if "path" not in values:
@@ -375,12 +373,6 @@ class TestHelper(_common.Assertions):
 
         return path
 
-    def _get_item_count(self):
-        if not hasattr(self, "__item_count"):
-            count = 0
-        self.__item_count = count + 1
-        return count
-
     # Running beets commands
 
     def run_command(self, *args, **kwargs):
@@ -462,7 +454,7 @@ class ItemInDBTestCase(BeetsTestCase):
         self.i = _common.item(self.lib)
 
 
-class PluginMixin:
+class PluginMixin(ConfigMixin):
     plugin: ClassVar[str]
     preload_plugin: ClassVar[bool] = True
 
@@ -483,7 +475,7 @@ class PluginMixin:
         """
         # FIXME this should eventually be handled by a plugin manager
         plugins = (self.plugin,) if hasattr(self, "plugin") else plugins
-        beets.config["plugins"] = plugins
+        self.config["plugins"] = plugins
         beets.plugins.load_plugins(plugins)
         beets.plugins.find_plugins()
 
@@ -504,7 +496,7 @@ class PluginMixin:
         # FIXME this should eventually be handled by a plugin manager
         for plugin_class in beets.plugins._instances:
             plugin_class.listeners = None
-        beets.config["plugins"] = []
+        self.config["plugins"] = []
         beets.plugins._classes = set()
         beets.plugins._instances = {}
         Item._types = getattr(Item, "_original_types", {})
@@ -513,12 +505,8 @@ class PluginMixin:
         Album._queries = getattr(Album, "_original_queries", {})
 
     @contextmanager
-    def configure_plugin(self, config: list[Any] | dict[str, Any]):
-        if isinstance(config, list):
-            beets.config[self.plugin] = config
-        else:
-            for key, value in config.items():
-                beets.config[self.plugin][key] = value
+    def configure_plugin(self, config: Any):
+        self.config[self.plugin].set(config)
         self.load_plugins(self.plugin)
 
         yield
@@ -638,7 +626,7 @@ class ImportHelper(TestHelper):
     def setup_importer(
         self, import_dir: bytes | None = None, **kwargs
     ) -> ImportSession:
-        config["import"].set_args({**self.default_import_config, **kwargs})
+        self.config["import"].set_args({**self.default_import_config, **kwargs})
         self.importer = self._get_import_session(import_dir or self.import_dir)
         return self.importer
 
@@ -687,7 +675,7 @@ class ImportSessionFixture(ImportSession):
     >>> importer.run()
 
     This imports ``/path/to/import`` into `lib`. It skips the first
-    album and imports thesecond one with metadata from the tags. For the
+    album and imports the second one with metadata from the tags. For the
     remaining albums, the metadata from the autotagger will be applied.
     """
 
@@ -722,10 +710,6 @@ class ImportSessionFixture(ImportSession):
     Resolution = Enum("Resolution", "REMOVE SKIP KEEPBOTH MERGE")
 
     default_resolution = "REMOVE"
-
-    def add_resolution(self, resolution):
-        assert isinstance(resolution, self.Resolution)
-        self._resolutions.append(resolution)
 
     def resolve_duplicate(self, task, found_duplicates):
         try:
@@ -779,12 +763,10 @@ class TerminalImportSessionFixture(TerminalImportSession):
             self.io.addinput("T")
         elif choice == importer.action.SKIP:
             self.io.addinput("S")
-        elif isinstance(choice, int):
+        else:
             self.io.addinput("M")
             self.io.addinput(str(choice))
             self._add_choice_input()
-        else:
-            raise Exception("Unknown choice %s" % choice)
 
 
 class TerminalImportMixin(ImportHelper):
@@ -801,82 +783,6 @@ class TerminalImportMixin(ImportHelper):
             io=self.io,
             paths=[import_dir],
         )
-
-
-def generate_album_info(album_id, track_values):
-    """Return `AlbumInfo` populated with mock data.
-
-    Sets the album info's `album_id` field is set to the corresponding
-    argument. For each pair (`id`, `values`) in `track_values` the `TrackInfo`
-    from `generate_track_info` is added to the album info's `tracks` field.
-    Most other fields of the album and track info are set to "album
-    info" and "track info", respectively.
-    """
-    tracks = [generate_track_info(id, values) for id, values in track_values]
-    album = AlbumInfo(
-        album_id="album info",
-        album="album info",
-        artist="album info",
-        artist_id="album info",
-        tracks=tracks,
-    )
-    for field in ALBUM_INFO_FIELDS:
-        setattr(album, field, "album info")
-
-    return album
-
-
-ALBUM_INFO_FIELDS = [
-    "album",
-    "album_id",
-    "artist",
-    "artist_id",
-    "asin",
-    "albumtype",
-    "va",
-    "label",
-    "barcode",
-    "artist_sort",
-    "releasegroup_id",
-    "catalognum",
-    "language",
-    "country",
-    "albumstatus",
-    "media",
-    "albumdisambig",
-    "releasegroupdisambig",
-    "artist_credit",
-    "data_source",
-    "data_url",
-]
-
-
-def generate_track_info(track_id="track info", values={}):
-    """Return `TrackInfo` populated with mock data.
-
-    The `track_id` field is set to the corresponding argument. All other
-    string fields are set to "track info".
-    """
-    track = TrackInfo(
-        title="track info",
-        track_id=track_id,
-    )
-    for field in TRACK_INFO_FIELDS:
-        setattr(track, field, "track info")
-    for field, value in values.items():
-        setattr(track, field, value)
-    return track
-
-
-TRACK_INFO_FIELDS = [
-    "artist",
-    "artist_id",
-    "artist_sort",
-    "disctitle",
-    "artist_credit",
-    "data_source",
-    "data_url",
-]
 
 
 class AutotagStub:
@@ -992,7 +898,7 @@ class FetchImageHelper:
         super().run(*args, **kwargs)
 
     IMAGEHEADER = {
-        "image/jpeg": b"\x00" * 6 + b"JFIF",
+        "image/jpeg": b"\xff\xd8\xff" + b"\x00" * 3 + b"JFIF",
         "image/png": b"\211PNG\r\n\032\n",
     }
 

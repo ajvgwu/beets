@@ -1,20 +1,140 @@
 Changelog
 =========
 
+Changelog goes here! Please add your entry to the bottom of one of the lists below!
+
 Unreleased
 ----------
 
-Changelog goes here! Please add your entry to the bottom of one of the lists below!
+Beets now requires Python 3.9 or later since support for EOL Python 3.8 has
+been dropped.
+
+New features:
+
+* :doc:`plugins/lastgenre`: The new configuration option, ``keep_existing``,
+  provides more fine-grained control over how pre-populated genre tags are
+  handled. The ``force`` option now behaves in a more conventional manner.
+  :bug:`4982`
+* :doc:`plugins/lyrics`: Add new configuration option ``dist_thresh`` to
+  control the maximum allowed distance between the lyrics search result and the
+  tagged item's artist and title. This is useful for preventing false positives
+  when fetching lyrics.
+* :doc:`plugins/lyrics`: Rewrite lyrics translation functionality to use Azure
+  AI Translator API and add relevant instructions to the documentation.
+
+Bug fixes:
+
+* :doc:`plugins/listenbrainz`: Fix rST formatting for URLs of Listenbrainz API Key documentation and config.yaml.
+* :doc:`plugins/listenbrainz`: Fix ``UnboundLocalError`` in cases where 'mbid' is not defined.
+* :doc:`plugins/fetchart`: Fix fetchart bug where a tempfile could not be deleted due to never being
+  properly closed.
+  :bug:`5521`
+* :doc:`plugins/lyrics`: LRCLib will fallback to plain lyrics if synced lyrics
+  are not found and `synced` flag is set to `yes`.
+* Synchronise files included in the source distribution with what we used to
+  have before the introduction of Poetry.
+  :bug:`5531`
+  :bug:`5526`
+* :ref:`write-cmd`: Fix the issue where for certain files differences in
+  ``mb_artistid``, ``mb_albumartistid`` and ``albumtype`` fields are shown on
+  every attempt to write tags. Note: your music needs to be reimported with
+  ``beet import -LI`` or synchronised with ``beet mbsync`` in order to fix
+  this!
+  :bug:`5265`
+  :bug:`5371`
+  :bug:`4715`
+* :ref:`import-cmd`: Fix ``MemoryError`` and improve performance tagging large
+  albums by replacing ``munkres`` library with ``lap.lapjv``.
+  :bug:`5207`
+* :ref:`query-sort`: Fix a bug that would raise an exception when sorting on
+  a non-string field that is not populated in all items.
+  :bug:`5512`
+* :doc:`plugins/lastgenre`: Fix track-level genre handling. Now when an album-level
+  genre is set already, single tracks don't fall back to the album's genre and
+  request their own last.fm genre. Also log messages regarding what's been
+  tagged are now more polished.
+  :bug:`5582`
+* Fix ambiguous column name ``sqlite3.OperationalError`` that occured in album
+  queries that filtered album track titles, for example ``beet list -a keyword
+  title:foo``.
+* :doc:`plugins/lyrics`: Rewrite lyrics tests using pytest to provide isolated
+  configuration for each test case. This fixes the issue where some tests
+  failed because they read developers' local lyrics configuration.
+  :bug:`5133`
+* :doc:`plugins/lyrics`: Do not attempt to search for lyrics if either the
+  artist or title is missing and ignore ``artist_sort`` value if it is empty.
+  :bug:`2635`
+* :doc:`plugins/lyrics`: Fix fetching lyrics from ``lrclib`` source. If we
+  cannot find lyrics for a specific album, artist, title combination, the
+  plugin now tries to search for the artist and title and picks the most
+  relevant result. Update the default ``sources`` configuration to prioritize
+  ``lrclib`` over other sources since it returns reliable results quicker than
+  others.
+  :bug:`5102`
+* :doc:`plugins/lyrics`: Fix the issue with ``genius`` backend not being able
+  to match lyrics when there is a slight variation in the artist name.
+  :bug:`4791`
+* :doc:`plugins/lyrics`: Fix plugin crash when ``genius`` backend returns empty
+  lyrics.
+  :bug:`5583`
+* ImageMagick 7.1.1-44 is now supported.
+
+For packagers:
+
+* The minimum supported Python version is now 3.9.
+* External plugin developers: ``beetsplug/__init__.py`` file can be removed
+  from your plugin as beets now uses native/implicit namespace package setup.
+
+Other changes:
+
+* Release workflow: fix the issue where the new release tag is created for the
+  wrong (outdated) commit. Now the tag is created in the same workflow step
+  right after committing the version update.
+  :bug:`5539`
+* Added some typehints: ImportSession and Pipeline have typehints now. Should
+  improve useability for new developers.
+* :doc:`/plugins/smartplaylist`: URL-encode additional item `fields` within generated
+  EXTM3U playlists instead of JSON-encoding them.
+
+2.2.0 (December 02, 2024)
+-------------------------
+
+New features:
+
+* :doc:`/plugins/substitute`: Allow the replacement string to use capture groups
+  from the match. It is thus possible to create more general rules, applying to
+  many different artists at once.
+
+Bug fixes:
+
+* Check if running python from the Microsoft Store and provide feedback to install
+  from python.org.
+  :bug:`5467`
+* Fix bug where matcher doesn't consider medium number when importing. This makes
+  it difficult to import hybrid SACDs and other releases with duplicate tracks.
+  :bug:`5148`
+* Bring back test files and the manual to the source distribution tarball.
+  :bug:`5513`
+
+Other changes:
+
+* Changed `bitesize` label to `good first issue`. Our `contribute`_ page is now
+  automatically populated with these issues. :bug:`4855`
+
+.. _contribute: https://github.com/beetbox/beets/contribute
+
+2.1.0 (November 22, 2024)
+-------------------------
 
 New features:
 
 * New template function added: ``%capitalize``. Converts the first letter of
   the text to uppercase and the rest to lowercase.
 * Ability to query albums with track db fields and vice-versa, for example
-  `beet list -a title:something` or `beet list artpath:cover`. Consequently
-  album queries involving `path` field have been sped up, like `beet list -a
-  path:/path/`.
-* New `keep_in_artist` option for the :doc:`plugins/ftintitle` plugin, which
+  ``beet list -a title:something`` or ``beet list artpath:cover``. Consequently
+  album queries involving ``path`` field have been sped up, like ``beet list -a
+  path:/path/``.
+* :doc:`plugins/ftintitle`: New ``keep_in_artist`` option for the plugin, which
   allows keeping the "feat." part in the artist metadata while still changing
   the title.
 * :doc:`plugins/autobpm`: Add new configuration option ``beat_track_kwargs``
@@ -42,31 +162,36 @@ Bug fixes:
   issues in the future.
   :bug:`5289`
 * :doc:`plugins/discogs`: Fix the ``TypeError`` when there is no description.
-* Remove single quotes from all SQL queries
+* Use single quotes in all SQL queries
   :bug:`4709`
 * :doc:`plugins/lyrics`: Update ``tekstowo`` backend to fetch lyrics directly
   since recent updates to their website made it unsearchable.
   :bug:`5456`
+* :doc:`plugins/convert`: Fixed the convert plugin ``no_convert`` option so
+  that it no longer treats "and" and "or" queries the same. To maintain
+  previous behaviour add commas between your query keywords. For help see
+  :ref:`combiningqueries`.
+* Fix the ``TypeError`` when :ref:`set_fields` is provided non-string values. :bug:`4840`
 
 For packagers:
 
 * The minimum supported Python version is now 3.8.
-* The `beet` script has been removed from the repository.
-* The `typing_extensions` is required for Python 3.10 and below.
+* The ``beet`` script has been removed from the repository.
+* The ``typing_extensions`` is required for Python 3.10 and below.
 
 Other changes:
 
-* :doc:`contributing`: The project now uses `poetry` for packaging and
+* :doc:`contributing`: The project now uses ``poetry`` for packaging and
   dependency management. This change affects project management and mostly
   affects beets developers. Please see updates in :ref:`getting-the-source` and
   :ref:`testing` for more information.
-* :doc:`contributing`: Since `poetry` now manages local virtual environments,
-  `tox` has been replaced by a task runner `poethepoet`. This change affects
+* :doc:`contributing`: Since ``poetry`` now manages local virtual environments,
+  `tox` has been replaced by a task runner ``poethepoet``. This change affects
   beets developers and contributors. Please see updates in the
   :ref:`development-tools` section for more details. Type ``poe`` while in
   the project directory to see the available commands.
 * Installation instructions have been made consistent across plugins
-  documentation. Users should simply install `beets` with an `extra` of the
+  documentation. Users should simply install ``beets`` with an ``extra`` of the
   corresponding plugin name in order to install extra dependencies for that
   plugin.
 * GitHub workflows have been reorganised for clarity: style, linting, type and
@@ -77,10 +202,10 @@ Other changes:
   documentation is changed, and they only check the changed files. When
   dependencies are updated (``poetry.lock``), then the entire code base is
   checked.
-* The long-deprecated `beets.util.confit` module has been removed.  This may
+* The long-deprecated ``beets.util.confit`` module has been removed.  This may
   cause extremely outdated external plugins to fail to load.
-* :doc:`plugins/autobpm`: Add plugin dependencies to `pyproject.toml` under
-  the `autobpm` extra and update the plugin installation instructions in the
+* :doc:`plugins/autobpm`: Add plugin dependencies to ``pyproject.toml`` under
+  the ``autobpm`` extra and update the plugin installation instructions in the
   docs.
   Since importing the bpm calculation functionality from ``librosa`` takes
   around 4 seconds, update the plugin to only do so when it actually needs to
@@ -253,6 +378,8 @@ New features:
 
 Bug fixes:
 
+* Improve ListenBrainz error handling.
+  :bug:`5459`
 * :doc:`/plugins/deezer`: Improve requests error handling.
 * :doc:`/plugins/lastimport`: Improve error handling in the `process_tracks` function and enable it to be used with other plugins.
 * :doc:`/plugins/spotify`: Improve handling of ConnectionError.
@@ -395,6 +522,8 @@ Bug fixes:
   `requests` timeout.
 * Fix cover art resizing logic to support multiple steps of resizing
   :bug:`5151`
+* :doc:`/plugins/convert`: Fix attempt to convert and perform side-effects if
+  library file is not readable.
 
 For plugin developers:
 

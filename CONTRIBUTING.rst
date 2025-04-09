@@ -118,10 +118,10 @@ command. Instead, you can activate the virtual environment in your shell with::
 
     $ poetry shell
 
-You should see ``(beets-py38)`` prefix in your shell prompt. Now you can run
+You should see ``(beets-py3.9)`` prefix in your shell prompt. Now you can run
 commands directly, for example::
 
-    $ (beets-py38) pytest
+    $ (beets-py3.9) pytest
 
 Additionally, `poethepoet`_ task runner assists us with the most common
 operations. Formatting, linting, testing are defined as ``poe`` tasks in
@@ -382,7 +382,7 @@ to get a basic view on how tests are written. Since we are currently migrating
 the tests from `unittest`_ to `pytest`_, new tests should be written using
 `pytest`_. Contributions migrating existing tests are welcome!
 
-External API requests under test should be mocked with `requests_mock`_,
+External API requests under test should be mocked with `requests-mock`_,
 However, we still want to know whether external APIs are up and that they
 return expected responses, therefore we test them weekly with our `integration
 test`_ suite.
