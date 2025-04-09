@@ -20,10 +20,10 @@ import unittest
 import pytest
 
 from beets import autotag, config
-from beets.autotag import AlbumInfo, TrackInfo, match
+from beets.autotag import AlbumInfo, TrackInfo, correct_list_fields, match
 from beets.autotag.hooks import Distance, string_dist
 from beets.library import Item
-from beets.test.helper import BeetsTestCase
+from beets.test.helper import BeetsTestCase, ConfigMixin
 from beets.util import plurality
 
 
@@ -498,85 +498,46 @@ class AlbumDistanceTest(BeetsTestCase):
         assert dist == 0
 
 
-class AssignmentTest(unittest.TestCase):
-    def item(self, title, track):
-        return Item(
-            title=title,
-            track=track,
-            mb_trackid="",
-            mb_albumid="",
-            mb_artistid="",
-        )
+class TestAssignment(ConfigMixin):
+    A = "one"
+    B = "two"
+    C = "three"
 
-    def test_reorder_when_track_numbers_incorrect(self):
-        items = []
-        items.append(self.item("one", 1))
-        items.append(self.item("three", 2))
-        items.append(self.item("two", 3))
-        trackinfo = []
-        trackinfo.append(TrackInfo(title="one"))
-        trackinfo.append(TrackInfo(title="two"))
-        trackinfo.append(TrackInfo(title="three"))
-        mapping, extra_items, extra_tracks = match.assign_items(
-            items, trackinfo
-        )
-        assert extra_items == []
-        assert extra_tracks == []
-        assert mapping == {
-            items[0]: trackinfo[0],
-            items[1]: trackinfo[2],
-            items[2]: trackinfo[1],
-        }
+    @pytest.fixture(autouse=True)
+    def _setup_config(self):
+        self.config["match"]["track_length_grace"] = 10
+        self.config["match"]["track_length_max"] = 30
 
-    def test_order_works_with_invalid_track_numbers(self):
-        items = []
-        items.append(self.item("one", 1))
-        items.append(self.item("three", 1))
-        items.append(self.item("two", 1))
-        trackinfo = []
-        trackinfo.append(TrackInfo(title="one"))
-        trackinfo.append(TrackInfo(title="two"))
-        trackinfo.append(TrackInfo(title="three"))
-        mapping, extra_items, extra_tracks = match.assign_items(
-            items, trackinfo
-        )
-        assert extra_items == []
-        assert extra_tracks == []
-        assert mapping == {
-            items[0]: trackinfo[0],
-            items[1]: trackinfo[2],
-            items[2]: trackinfo[1],
-        }
+    @pytest.mark.parametrize(
+        # 'expected' is a tuple of expected (mapping, extra_items, extra_tracks)
+        "item_titles, track_titles, expected",
+        [
+            # items ordering gets corrected
+            ([A, C, B], [A, B, C], ({A: A, B: B, C: C}, [], [])),
+            # unmatched tracks are returned as 'extra_tracks'
+            # the first track is unmatched
+            ([B, C], [A, B, C], ({B: B, C: C}, [], [A])),
+            # the middle track is unmatched
+            ([A, C], [A, B, C], ({A: A, C: C}, [], [B])),
+            # the last track is unmatched
+            ([A, B], [A, B, C], ({A: A, B: B}, [], [C])),
+            # unmatched items are returned as 'extra_items'
+            ([A, C, B], [A, C], ({A: A, C: C}, [B], [])),
+        ],
+    )
+    def test_assign_tracks(self, item_titles, track_titles, expected):
+        expected_mapping, expected_extra_items, expected_extra_tracks = expected
 
-    def test_order_works_with_missing_tracks(self):
-        items = []
-        items.append(self.item("one", 1))
-        items.append(self.item("three", 3))
-        trackinfo = []
-        trackinfo.append(TrackInfo(title="one"))
-        trackinfo.append(TrackInfo(title="two"))
-        trackinfo.append(TrackInfo(title="three"))
-        mapping, extra_items, extra_tracks = match.assign_items(
-            items, trackinfo
-        )
-        assert extra_items == []
-        assert extra_tracks == [trackinfo[1]]
-        assert mapping == {items[0]: trackinfo[0], items[1]: trackinfo[2]}
+        items = [Item(title=title) for title in item_titles]
+        tracks = [TrackInfo(title=title) for title in track_titles]
 
-    def test_order_works_with_extra_tracks(self):
-        items = []
-        items.append(self.item("one", 1))
-        items.append(self.item("two", 2))
-        items.append(self.item("three", 3))
-        trackinfo = []
-        trackinfo.append(TrackInfo(title="one"))
-        trackinfo.append(TrackInfo(title="three"))
-        mapping, extra_items, extra_tracks = match.assign_items(
-            items, trackinfo
-        )
-        assert extra_items == [items[1]]
-        assert extra_tracks == []
-        assert mapping == {items[0]: trackinfo[0], items[2]: trackinfo[1]}
+        mapping, extra_items, extra_tracks = match.assign_items(items, tracks)
+
+        assert (
+            {i.title: t.title for i, t in mapping.items()},
+            [i.title for i in extra_items],
+            [t.title for t in extra_tracks],
+        ) == (expected_mapping, expected_extra_items, expected_extra_tracks)
 
     def test_order_works_when_track_names_are_entirely_wrong(self):
         # A real-world test case contributed by a user.
@@ -587,9 +548,6 @@ class AssignmentTest(unittest.TestCase):
                 title=f"ben harper - Burn to Shine {i}",
                 track=i,
                 length=length,
-                mb_trackid="",
-                mb_albumid="",
-                mb_artistid="",
             )
 
         items = []
@@ -623,13 +581,9 @@ class AssignmentTest(unittest.TestCase):
         trackinfo.append(info(11, "Beloved One", 243.733))
         trackinfo.append(info(12, "In the Lord's Arms", 186.13300000000001))
 
-        mapping, extra_items, extra_tracks = match.assign_items(
-            items, trackinfo
-        )
-        assert extra_items == []
-        assert extra_tracks == []
-        for item, info in mapping.items():
-            assert items.index(item) == trackinfo.index(info)
+        expected = dict(zip(items, trackinfo)), [], []
+
+        assert match.assign_items(items, trackinfo) == expected
 
 
 class ApplyTestUtil:
@@ -1040,3 +994,36 @@ class StringDistanceTest(unittest.TestCase):
     def test_accented_characters(self):
         dist = string_dist("\xe9\xe1\xf1", "ean")
         assert dist == 0.0
+
+
+@pytest.mark.parametrize(
+    "single_field,list_field",
+    [
+        ("mb_artistid", "mb_artistids"),
+        ("mb_albumartistid", "mb_albumartistids"),
+        ("albumtype", "albumtypes"),
+    ],
+)
+@pytest.mark.parametrize(
+    "single_value,list_value",
+    [
+        (None, []),
+        (None, ["1"]),
+        (None, ["1", "2"]),
+        ("1", []),
+        ("1", ["1"]),
+        ("1", ["1", "2"]),
+        ("1", ["2", "1"]),
+    ],
+)
+def test_correct_list_fields(
+    single_field, list_field, single_value, list_value
+):
+    """Ensure that the first value in a list field matches the single field."""
+    data = {single_field: single_value, list_field: list_value}
+    item = Item(**data)
+
+    correct_list_fields(item)
+
+    single_val, list_val = item[single_field], item[list_field]
+    assert (not single_val and not list_val) or single_val == list_val[0]

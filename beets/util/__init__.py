@@ -33,15 +33,14 @@ from enum import Enum
 from importlib import import_module
 from multiprocessing.pool import ThreadPool
 from pathlib import Path
+from re import Pattern
 from typing import (
     TYPE_CHECKING,
     Any,
     AnyStr,
     Callable,
-    Iterator,
+    Iterable,
     NamedTuple,
-    Pattern,
-    Sequence,
     TypeVar,
     Union,
 )
@@ -51,6 +50,7 @@ from unidecode import unidecode
 from beets.util import hidden
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator, Sequence
     from logging import Logger
 
 if sys.version_info >= (3, 10):
@@ -164,7 +164,7 @@ class MoveOperation(Enum):
     REFLINK_AUTO = 5
 
 
-def normpath(path: bytes) -> bytes:
+def normpath(path: PathLike) -> bytes:
     """Provide the canonical form of the path suitable for storing in
     the database.
     """
@@ -198,8 +198,8 @@ def ancestry(path: AnyStr) -> list[AnyStr]:
 
 
 def sorted_walk(
-    path: AnyStr,
-    ignore: Sequence[bytes] = (),
+    path: PathLike,
+    ignore: Sequence[PathLike] = (),
     ignore_hidden: bool = False,
     logger: Logger | None = None,
 ) -> Iterator[tuple[bytes, Sequence[bytes], Sequence[bytes]]]:
@@ -210,7 +210,9 @@ def sorted_walk(
     """
     # Make sure the paths aren't Unicode strings.
     bytes_path = bytestring_path(path)
-    ignore = [bytestring_path(i) for i in ignore]
+    ignore_bytes = [  # rename prevents mypy variable shadowing issue
+        bytestring_path(i) for i in ignore
+    ]
 
     # Get all the directories and files at this level.
     try:
@@ -230,7 +232,7 @@ def sorted_walk(
 
         # Skip ignored filenames.
         skip = False
-        for pat in ignore:
+        for pat in ignore_bytes:
             if fnmatch.fnmatch(base, pat):
                 if logger:
                     logger.debug(
@@ -257,7 +259,7 @@ def sorted_walk(
     # Recurse into directories.
     for base in dirs:
         cur = os.path.join(bytes_path, base)
-        yield from sorted_walk(cur, ignore, ignore_hidden, logger)
+        yield from sorted_walk(cur, ignore_bytes, ignore_hidden, logger)
 
 
 def path_as_posix(path: bytes) -> bytes:
@@ -297,8 +299,8 @@ def fnmatch_all(names: Sequence[bytes], patterns: Sequence[bytes]) -> bool:
 
 
 def prune_dirs(
-    path: bytes,
-    root: bytes | None = None,
+    path: PathLike,
+    root: PathLike | None = None,
     clutter: Sequence[str] = (".DS_Store", "Thumbs.db"),
 ):
     """If path is an empty directory, then remove it. Recursively remove
@@ -419,12 +421,13 @@ PATH_SEP: bytes = bytestring_path(os.sep)
 
 
 def displayable_path(
-    path: BytesOrStr | tuple[BytesOrStr, ...], separator: str = "; "
+    path: PathLike | Iterable[PathLike], separator: str = "; "
 ) -> str:
     """Attempts to decode a bytestring path to a unicode object for the
     purpose of displaying it to the user. If the `path` argument is a
     list or a tuple, the elements are joined with `separator`.
     """
+
     if isinstance(path, (list, tuple)):
         return separator.join(displayable_path(p) for p in path)
     elif isinstance(path, str):
@@ -472,7 +475,7 @@ def samefile(p1: bytes, p2: bytes) -> bool:
     return False
 
 
-def remove(path: bytes, soft: bool = True):
+def remove(path: PathLike, soft: bool = True):
     """Remove the file. If `soft`, then no error will be raised if the
     file does not exist.
     """
@@ -510,10 +513,7 @@ def copy(path: bytes, dest: bytes, replace: bool = False):
 def move(path: bytes, dest: bytes, replace: bool = False):
     """Rename a file. `dest` may not be a directory. If `dest` already
     exists, raises an OSError unless `replace` is True. Has no effect if
-    `path` is the same as `dest`. If the paths are on different
-    filesystems (or the rename otherwise fails), a copy is attempted
-    instead, in which case metadata will *not* be preserved. Paths are
-    translated to system paths.
+    `path` is the same as `dest`. Paths are translated to system paths.
     """
     if os.path.isdir(syspath(path)):
         raise FilesystemError("source is directory", "move", (path, dest))
@@ -547,6 +547,14 @@ def move(path: bytes, dest: bytes, replace: bool = False):
                 shutil.copyfileobj(f, tmp)  # type: ignore[misc]
         finally:
             tmp.close()
+
+        try:
+            # Copy file metadata
+            shutil.copystat(syspath(path), tmp.name)
+        except OSError:
+            # Ignore errors because it doesn't matter too much.  We may be on a
+            # filesystem that doesn't support this.
+            pass
 
         # Move the copied file into place.
         tmp_filename = tmp.name
@@ -1125,5 +1133,13 @@ def get_temp_filename(
     tempdir = get_module_tempdir(module)
     tempdir.mkdir(parents=True, exist_ok=True)
 
-    _, filename = tempfile.mkstemp(dir=tempdir, prefix=prefix, suffix=suffix)
+    descriptor, filename = tempfile.mkstemp(
+        dir=tempdir, prefix=prefix, suffix=suffix
+    )
+    os.close(descriptor)
     return bytestring_path(filename)
+
+
+def unique_list(elements: Iterable[T]) -> list[T]:
+    """Return a list with unique elements in the original order."""
+    return list(dict.fromkeys(elements))
